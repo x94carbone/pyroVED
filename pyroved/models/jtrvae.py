@@ -8,7 +8,7 @@ and/or translations
 
 Created by Maxim Ziatdinov (email: ziatdinovmax@gmail.com)
 """
-from typing import Optional, Tuple, Union
+from typing import Tuple, Union
 
 import pyro
 import pyro.distributions as dist
@@ -124,8 +124,7 @@ class jtrVAE(baseVAE):
 
     def model(self,
               x: torch.Tensor,
-              y: Optional[torch.Tensor] = None,
-              **kwargs: float) -> torch.Tensor:
+              **kwargs: float) -> None:
         """
         Defines the model p(x|z,c)p(z)p(c)
         """
@@ -167,8 +166,7 @@ class jtrVAE(baseVAE):
 
     def guide(self,
               x: torch.Tensor,
-              y: Optional[torch.Tensor] = None,
-              **kwargs: float) -> torch.Tensor:
+              **kwargs: float) -> None:
         """
         Defines the guide q(z,c|x)
         """
@@ -212,6 +210,14 @@ class jtrVAE(baseVAE):
     def encode(self, x_new: torch.Tensor, **kwargs: int) -> torch.Tensor:
         """
         Encodes data using a trained inference (encoder) network
+
+        Args:
+            x_new:
+                Data to encode with a trained trVAE. The new data must have
+                the same dimensions (images height and width or spectra length)
+                as the one used for training.
+            kwargs:
+                Batch size as 'batch_size' (for encoding large volumes of data)
         """
         z = self._encode(x_new)
         z_loc = z[:, :self.z_dim]
@@ -223,6 +229,10 @@ class jtrVAE(baseVAE):
     def decode(self, z: torch.Tensor, y: torch.Tensor, **kwargs: int) -> torch.Tensor:
         """
         Decodes a batch of latent coordinates
+
+        Args:
+            z: Latent coordinates (without rotational and translational parts)
+            y: Classes as one-hot vectors for each sample in z
         """
         z = torch.cat([z.to(self.device), y.to(self.device)], -1)
         loc = self._decode(z, **kwargs)
@@ -232,9 +242,17 @@ class jtrVAE(baseVAE):
                    **kwargs: Union[str, int]) -> torch.Tensor:
         """
         Plots a learned latent manifold in the image space
+
+        Args:
+            d: Grid size
+            disc_idx: Discrete dimension for which we plot continuous latent manifolds
+            plot: Plots the generated manifold (Default: True)
+            kwargs: Keyword arguments include custom min/max values for grid
+                    boundaries passed as 'z_coord' (e.g. z_coord = [-3, 3, -3, 3])
+                    and plot parameters ('padding', 'padding_value', 'cmap', 'origin', 'ylim')
         """
         z_disc = to_onehot(tt(disc_idx).unsqueeze(0), self.discrete_dim)
-        z, (grid_x, grid_y) = generate_latent_grid(d)
+        z, (grid_x, grid_y) = generate_latent_grid(d, **kwargs)
         z = z.to(self.device)
         z = torch.cat([z, z_disc.repeat(z.shape[0], 1)], dim=-1)
         z = [z]
